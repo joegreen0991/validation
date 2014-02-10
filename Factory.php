@@ -52,9 +52,9 @@ class Factory {
 	 * @param  array  $messages
 	 * @return void
 	 */
-	public function __construct(array $messages, PresenceVerifierInterface $presenceVerifier = null)
+	public function __construct(array $messages = null, PresenceVerifierInterface $presenceVerifier = null)
 	{
-		$this->messages = $messages;
+		$this->messages = $messages ?: include __DIR__ . '/messages.php';
                 
                 $this->verifier = $presenceVerifier;
 	}
