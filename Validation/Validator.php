@@ -149,11 +149,11 @@ class Validator {
 	 */
 	public function mergeRules($attribute, $rules)
 	{
-		$current = array_get($this->rules, $attribute, array());
+		$current = $this->arrayGet($this->rules, $attribute, array());
 
-		$merge = head($this->explodeRules(array($rules)));
+		$merge = $this->explodeRules(array($rules));
 
-		$this->rules[$attribute] = array_merge($current, $merge);
+		$this->rules[$attribute] = array_merge($current, reset($merge));
 	}
 
 	/**
@@ -223,11 +223,11 @@ class Validator {
 	 */
 	protected function getValue($attribute)
 	{
-		if ( ! is_null($value = array_get($this->data, $attribute)))
+		if ( ! is_null($value = $this->arrayGet($this->data, $attribute)))
 		{
 			return $value;
 		}
-		elseif ( ! is_null($value = array_get($this->files, $attribute)))
+		elseif ( ! is_null($value = $this->arrayGet($this->files, $attribute)))
 		{
 			return $value;
 		}
@@ -499,7 +499,7 @@ class Validator {
 	 */
 	protected function validateRequiredIf($attribute, $value, $parameters)
 	{
-		if ($parameters[1] == array_get($this->data, $parameters[0]))
+		if ($parameters[1] == $this->arrayGet($this->data, $parameters[0]))
 		{
 			return $this->validateRequired($attribute, $value);
 		}
@@ -550,7 +550,7 @@ class Validator {
 	 */
 	protected function validateSame($attribute, $value, $parameters)
 	{
-		$other = array_get($this->data, $parameters[0]);
+		$other = $this->arrayGet($this->data, $parameters[0]);
 
 		return (isset($other) && $value == $other);
 	}
@@ -723,7 +723,7 @@ class Validator {
 		// entire length of the string will be considered the attribute size.
 		if (is_numeric($value) && $hasNumeric)
 		{
-			return array_get($this->data, $attribute);
+			return $this->arrayGet($this->data, $attribute);
 		}
 		elseif (is_array($value))
 		{
@@ -1143,7 +1143,7 @@ class Validator {
 	 */
 	protected function getMessage($attribute, $rule)
 	{
-		$lowerRule = snake_case($rule);
+		$lowerRule = $this->snakeCase($rule);
 
 		$inlineMessage = $this->getInlineMessage($attribute, $lowerRule);
 
@@ -1249,9 +1249,9 @@ class Validator {
 	{
 		$message = str_replace(':attribute', $this->getAttribute($attribute), $message);
 
-		if (isset($this->replacers[snake_case($rule)]))
+		if (isset($this->replacers[$this->snakeCase($rule)]))
 		{
-			$message = $this->callReplacer($message, $attribute, snake_case($rule), $parameters);
+			$message = $this->callReplacer($message, $attribute, $this->snakeCase($rule), $parameters);
 		}
 		elseif (method_exists($this, $replacer = "replace{$rule}"))
 		{
@@ -1605,7 +1605,7 @@ class Validator {
 			$parameters = $this->parseParameters($rule, $parameter);
 		}
 
-		return array(studly_case($rule), $parameters);
+		return array($this->studlyCase($rule), $parameters);
 	}
 
 	/**
@@ -1642,7 +1642,7 @@ class Validator {
 	{
 		if ($extensions)
 		{
-			$keys = array_map('snake_case', array_keys($extensions));
+			$keys = array_map('$this->snakeCase', array_keys($extensions));
 
 			$extensions = array_combine($keys, array_values($extensions));
 		}
@@ -1662,7 +1662,7 @@ class Validator {
 
 		foreach ($extensions as $rule => $extension)
 		{
-			$this->implicitRules[] = studly_case($rule);
+			$this->implicitRules[] = $this->studlyCase($rule);
 		}
 	}
 
@@ -1675,7 +1675,7 @@ class Validator {
 	 */
 	public function addExtension($rule, $extension)
 	{
-		$this->extensions[snake_case($rule)] = $extension;
+		$this->extensions[$this->snakeCase($rule)] = $extension;
 	}
 
 	/**
@@ -1689,7 +1689,7 @@ class Validator {
 	{
 		$this->addExtension($rule, $extension);
 
-		$this->implicitRules[] = studly_case($rule);
+		$this->implicitRules[] = $this->studlyCase($rule);
 	}
 
 	/**
@@ -1712,7 +1712,7 @@ class Validator {
 	{
 		if ($replacers)
 		{
-			$keys = array_map('snake_case', array_keys($replacers));
+			$keys = array_map('$this->snakeCase', array_keys($replacers));
 
 			$replacers = array_combine($keys, array_values($replacers));
 		}
@@ -1729,7 +1729,7 @@ class Validator {
 	 */
 	public function addReplacer($rule, $replacer)
 	{
-		$this->replacers[snake_case($rule)] = $replacer;
+		$this->replacers[$this->snakeCase($rule)] = $replacer;
 	}
 
 	/**
@@ -1946,6 +1946,34 @@ class Validator {
 
 		return call_user_func_array($callback, func_get_args());
 	}
+        
+        /**
+	 * Convert a string to snake case.
+	 *
+	 * @param  string  $value
+	 * @param  string  $delimiter
+	 * @return string
+	 */
+	private static function snakeCase($value, $delimiter = '_')
+	{
+		$replace = '$1'.$delimiter.'$2';
+
+		return ctype_lower($value) ? $value : strtolower(preg_replace('/(.)([A-Z])/', $replace, $value));
+	}
+        
+        
+        /**
+	 * Convert a value to studly caps case.
+	 *
+	 * @param  string  $value
+	 * @return string
+	 */
+	private function studlyCase($value)
+	{
+		$value = ucwords(str_replace(array('-', '_'), ' ', $value));
+
+		return str_replace(' ', '', $value);
+	}
 
 	/**
 	 * Handle dynamic calls to class methods.
@@ -1958,7 +1986,7 @@ class Validator {
 	 */
 	public function __call($method, $parameters)
 	{
-		$rule = snake_case(substr($method, 8));
+		$rule = $this->snakeCase(substr($method, 8));
 
 		if (isset($this->extensions[$rule]))
 		{
