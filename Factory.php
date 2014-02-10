@@ -1,31 +1,22 @@
-<?php namespace Illuminate\Validation;
+<?php namespace Validation;
 
 use Closure;
-use Illuminate\Container\Container;
-use Symfony\Component\Translation\TranslatorInterface;
 
 class Factory {
 
 	/**
-	 * The Translator implementation.
+	 * The message array.
 	 *
-	 * @var \Symfony\Component\Translation\TranslatorInterface
+	 * @var array
 	 */
-	protected $translator;
+	protected $messages;
 
 	/**
 	 * The Presence Verifier implementation.
 	 *
-	 * @var \Illuminate\Validation\PresenceVerifierInterface
+	 * @var \Validation\PresenceVerifierInterface
 	 */
 	protected $verifier;
-
-	/**
-	 * The IoC container instance.
-	 *
-	 * @var \Illuminate\Container\Container
-	 */
-	protected $container;
 
 	/**
 	 * All of the custom validator extensions.
@@ -56,23 +47,16 @@ class Factory {
 	protected $fallbackMessages = array();
 
 	/**
-	 * The Validator resolver instance.
-	 *
-	 * @var Closure
-	 */
-	protected $resolver;
-
-	/**
 	 * Create a new Validator factory instance.
 	 *
-	 * @param  \Symfony\Component\Translation\TranslatorInterface  $translator
-	 * @param  \Illuminate\Container\Container  $container
+	 * @param  array  $messages
 	 * @return void
 	 */
-	public function __construct(TranslatorInterface $translator, Container $container = null)
+	public function __construct(array $messages, PresenceVerifierInterface $presenceVerifier = null)
 	{
-		$this->container = $container;
-		$this->translator = $translator;
+		$this->messages = $messages;
+                
+                $this->verifier = $presenceVerifier;
 	}
 
 	/**
@@ -83,24 +67,16 @@ class Factory {
 	 * @param  array  $messages
 	 * @return \Illuminate\Validation\Validator
 	 */
-	public function make(array $data, array $rules, array $messages = array(), array $customAttributes = array())
+	public function make(array $data, array $rules, array $customAttributes = array())
 	{
 		// The presence verifier is responsible for checking the unique and exists data
 		// for the validator. It is behind an interface so that multiple versions of
 		// it may be written besides database. We'll inject it into the validator.
-		$validator = $this->resolve($data, $rules, $messages, $customAttributes);
+		$validator = new Validator($this->messages, $data, $rules, $customAttributes);
 
 		if ( ! is_null($this->verifier))
 		{
 			$validator->setPresenceVerifier($this->verifier);
-		}
-
-		// Next we'll set the IoC container instance of the validator, which is used to
-		// resolve out class based validator extensions. If it is not set then these
-		// types of extensions will not be possible on these validation instances.
-		if ( ! is_null($this->container))
-		{
-			$validator->setContainer($this->container);
 		}
 
 		$this->addExtensions($validator);
@@ -128,26 +104,6 @@ class Factory {
 		$validator->addReplacers($this->replacers);
 
 		$validator->setFallbackMessages($this->fallbackMessages);
-	}
-
-	/**
-	 * Resolve a new Validator instance.
-	 *
-	 * @param  array  $data
-	 * @param  array  $rules
-	 * @param  array  $messages
-	 * @return \Illuminate\Validation\Validator
-	 */
-	protected function resolve($data, $rules, $messages, $customAttributes)
-	{
-		if (is_null($this->resolver))
-		{
-			return new Validator($this->translator, $data, $rules, $messages, $customAttributes);
-		}
-		else
-		{
-			return call_user_func($this->resolver, $this->translator, $data, $rules, $messages, $customAttributes);
-		}
 	}
 
 	/**
@@ -193,30 +149,9 @@ class Factory {
 	}
 
 	/**
-	 * Set the Validator instance resolver.
-	 *
-	 * @param  Closure  $resolver
-	 * @return void
-	 */
-	public function resolver(Closure $resolver)
-	{
-		$this->resolver = $resolver;
-	}
-
-	/**
-	 * Get the Translator implementation.
-	 *
-	 * @return \Symfony\Component\Translation\TranslatorInterface
-	 */
-	public function getTranslator()
-	{
-		return $this->translator;
-	}
-
-	/**
 	 * Get the Presence Verifier implementation.
 	 *
-	 * @return \Illuminate\Validation\PresenceVerifierInterface
+	 * @return \Validation\PresenceVerifierInterface
 	 */
 	public function getPresenceVerifier()
 	{
@@ -226,7 +161,7 @@ class Factory {
 	/**
 	 * Set the Presence Verifier implementation.
 	 *
-	 * @param  \Illuminate\Validation\PresenceVerifierInterface  $presenceVerifier
+	 * @param  \Validation\PresenceVerifierInterface  $presenceVerifier
 	 * @return void
 	 */
 	public function setPresenceVerifier(PresenceVerifierInterface $presenceVerifier)

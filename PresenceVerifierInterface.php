@@ -1,4 +1,4 @@
-<?php namespace Illuminate\Validation;
+<?php namespace Validation;
 
 interface PresenceVerifierInterface {
 

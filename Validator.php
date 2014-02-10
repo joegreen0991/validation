@@ -1,28 +1,16 @@
-<?php namespace Illuminate\Validation;
+<?php namespace Validation;
 
-use Closure;
 use DateTime;
-use Illuminate\Support\Fluent;
-use Illuminate\Support\MessageBag;
-use Illuminate\Container\Container;
 use Symfony\Component\HttpFoundation\File\File;
-use Symfony\Component\Translation\TranslatorInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Illuminate\Support\Contracts\MessageProviderInterface;
+use Validation\PresenceVerifierInterface;
 
-class Validator implements MessageProviderInterface {
-
-	/**
-	 * The Translator implementation.
-	 *
-	 * @var \Symfony\Component\Translation\TranslatorInterface
-	 */
-	protected $translator;
+class Validator {
 
 	/**
 	 * The Presence Verifier implementation.
 	 *
-	 * @var \Illuminate\Validation\PresenceVerifierInterface
+	 * @var \Validation\PresenceVerifierInterface
 	 */
 	protected $presenceVerifier;
 
@@ -36,9 +24,9 @@ class Validator implements MessageProviderInterface {
 	/**
 	 * The message bag instance.
 	 *
-	 * @var \Illuminate\Support\MessageBag
+	 * @var array
 	 */
-	protected $messages;
+	protected $messages = array();
 
 	/**
 	 * The data under validation.
@@ -128,39 +116,12 @@ class Validator implements MessageProviderInterface {
 	 * @param  array  $messages
 	 * @return void
 	 */
-	public function __construct(TranslatorInterface $translator, $data, $rules, $messages = array(), $customAttributes = array())
+	public function __construct($messages = array(), $data, $rules, $customAttributes = array())
 	{
-		$this->translator = $translator;
 		$this->customMessages = $messages;
-		$this->data = $this->parseData($data);
+		$this->data = $data;
 		$this->rules = $this->explodeRules($rules);
 		$this->customAttributes = $customAttributes;
-	}
-
-	/**
-	 * Parse the data and hydrate the files array.
-	 *
-	 * @param  array  $data
-	 * @return array
-	 */
-	protected function parseData(array $data)
-	{
-		$this->files = array();
-
-		foreach ($data as $key => $value)
-		{
-			// If this value is an instance of the HttpFoundation File class we will
-			// remove it from the data array and add it to the files array, which
-			// is used to conveniently separate out the files from other datas.
-			if ($value instanceof File)
-			{
-				$this->files[$key] = $value;
-
-				unset($data[$key]);
-			}
-		}
-
-		return $data;
 	}
 
 	/**
@@ -177,27 +138,6 @@ class Validator implements MessageProviderInterface {
 		}
 
 		return $rules;
-	}
-
-	/**
-	 * Add conditions to a given field based on a Closure.
-	 *
-	 * @param  string  $attribute
-	 * @param  string|array  $rules
-	 * @param  callable  $callback
-	 * @return void
-	 */
-	public function sometimes($attribute, $rules, $callback)
-	{
-		$payload = new Fluent(array_merge($this->data, $this->files));
-
-		if (call_user_func($callback, $payload))
-		{
-			foreach ((array) $attribute as $key)
-			{
-				$this->mergeRules($key, $rules);
-			}
-		}
 	}
 
 	/**
@@ -223,8 +163,6 @@ class Validator implements MessageProviderInterface {
 	 */
 	public function passes()
 	{
-		$this->messages = new MessageBag;
-
 		// We'll spin through each rule, validating the attributes attached to that
 		// rule. Any error messages will be added to the containers with each of
 		// the other error messages, returning true if we don't have messages.
@@ -236,7 +174,7 @@ class Validator implements MessageProviderInterface {
 			}
 		}
 
-		return count($this->messages->all()) === 0;
+		return count($this->messages) === 0;
 	}
 
 	/**
@@ -380,7 +318,7 @@ class Validator implements MessageProviderInterface {
 
 		$message = $this->doReplacements($message, $attribute, $rule, $parameters);
 
-		$this->messages->add($attribute, $message);
+		$this->messages[$attribute] = $message;
 	}
 
 	/**
@@ -1217,39 +1155,9 @@ class Validator implements MessageProviderInterface {
 			return $inlineMessage;
 		}
 
-		$customKey = "validation.custom.{$attribute}.{$lowerRule}";
-
-		$customMessage = $this->translator->trans($customKey);
-
-		// First we check for a custom defined validation message for the attribute
-		// and rule. This allows the developer to specify specific messages for
-		// only some attributes and rules that need to get specially formed.
-		if ($customMessage !== $customKey)
-		{
-			return $customMessage;
-		}
-
-		// If the rule being validated is a "size" rule, we will need to gather the
-		// specific error message for the type of attribute being validated such
-		// as a number, file or string which all have different message types.
-		elseif (in_array($rule, $this->sizeRules))
-		{
-			return $this->getSizeMessage($attribute, $rule);
-		}
-
-		// Finally, if no developer specified messages have been set, and no other
-		// special messages apply for this rule, we will just pull the default
-		// messages out of the translator service for this validation rule.
-		$key = "validation.{$lowerRule}";
-
-		if ($key != ($value = $this->translator->trans($key)))
-		{
-			return $value;
-		}
-
 		return $this->getInlineMessage(
 			$attribute, $lowerRule, $this->fallbackMessages
-		) ?: $key;
+		) ;
 	}
 
 	/**
@@ -1263,8 +1171,13 @@ class Validator implements MessageProviderInterface {
 	protected function getInlineMessage($attribute, $lowerRule, $source = null)
 	{
 		$source = $source ?: $this->customMessages;
+                
+                // There are three different types of size validations. The attribute may be
+		// either a number, file, or string so we will check a few things to know
+		// which type of value it is and return the correct line for that type.
+		$type = $this->getAttributeType($attribute);
 
-		$keys = array("{$attribute}.{$lowerRule}", $lowerRule);
+		$keys = array("{$attribute}.{$lowerRule}", $lowerRule, "{$attribute}.{$lowerRule}.{$type}", "{$lowerRule}.{$type}");
 
 		// First we will check for a custom message for an attribute specific rule
 		// message for the fields, then we will check for a general custom line
@@ -1275,26 +1188,6 @@ class Validator implements MessageProviderInterface {
 		}
 	}
 
-	/**
-	 * Get the proper error message for an attribute and size rule.
-	 *
-	 * @param  string  $attribute
-	 * @param  string  $rule
-	 * @return string
-	 */
-	protected function getSizeMessage($attribute, $rule)
-	{
-		$lowerRule = snake_case($rule);
-
-		// There are three different types of size validations. The attribute may be
-		// either a number, file, or string so we will check a few things to know
-		// which type of value it is and return the correct line for that type.
-		$type = $this->getAttributeType($attribute);
-
-		$key = "validation.{$lowerRule}.{$type}";
-
-		return $this->translator->trans($key);
-	}
 
 	/**
 	 * Get the data type of the given attribute.
@@ -1385,23 +1278,7 @@ class Validator implements MessageProviderInterface {
 			return $this->customAttributes[$attribute];
 		}
 
-		$key = "validation.attributes.{$attribute}";
-
-		// We allow for the developer to specify language lines for each of the
-		// attributes allowing for more displayable counterparts of each of
-		// the attributes. This provides the ability for simple formats.
-		if (($line = $this->translator->trans($key)) !== $key)
-		{
-			return $line;
-		}
-
-		// If no language line has been specified for the attribute all of the
-		// underscores are removed from the attribute name and that will be
-		// used as default versions of the attribute's displayable names.
-		else
-		{
-			return str_replace('_', ' ', $attribute);
-		}
+		return str_replace('_', ' ', $attribute);
 	}
 
 	/**
@@ -1853,7 +1730,7 @@ class Validator implements MessageProviderInterface {
 	 */
 	public function setData(array $data)
 	{
-		$this->data = $this->parseData($data);
+		$this->data = $data;
 	}
 
 	/**
@@ -1870,7 +1747,7 @@ class Validator implements MessageProviderInterface {
 	 * Set the validation rules.
 	 *
 	 * @param  array  $rules
-	 * @return \Illuminate\Validation\Validator
+	 * @return \Validation\Validator
 	 */
 	public function setRules(array $rules)
 	{
@@ -1883,7 +1760,7 @@ class Validator implements MessageProviderInterface {
 	 * Set the custom attributes on the validator.
 	 *
 	 * @param  array  $attributes
-	 * @return \Illuminate\Validation\Validator
+	 * @return \Validation\Validator
 	 */
 	public function setAttributeNames(array $attributes)
 	{
@@ -1906,7 +1783,7 @@ class Validator implements MessageProviderInterface {
 	 * Set the files under validation.
 	 *
 	 * @param  array  $files
-	 * @return \Illuminate\Validation\Validator
+	 * @return \Validation\Validator
 	 */
 	public function setFiles(array $files)
 	{
@@ -1918,7 +1795,7 @@ class Validator implements MessageProviderInterface {
 	/**
 	 * Get the Presence Verifier implementation.
 	 *
-	 * @return \Illuminate\Validation\PresenceVerifierInterface
+	 * @return \Validation\PresenceVerifierInterface
 	 *
 	 * @throws \RuntimeException
 	 */
@@ -1935,7 +1812,7 @@ class Validator implements MessageProviderInterface {
 	/**
 	 * Set the Presence Verifier implementation.
 	 *
-	 * @param  \Illuminate\Validation\PresenceVerifierInterface  $presenceVerifier
+	 * @param  \Validation\PresenceVerifierInterface  $presenceVerifier
 	 * @return void
 	 */
 	public function setPresenceVerifier(PresenceVerifierInterface $presenceVerifier)
@@ -2019,7 +1896,7 @@ class Validator implements MessageProviderInterface {
 	/**
 	 * Get the message container for the validator.
 	 *
-	 * @return \Illuminate\Support\MessageBag
+	 * @return array
 	 */
 	public function messages()
 	{
@@ -2031,7 +1908,7 @@ class Validator implements MessageProviderInterface {
 	/**
 	 * An alternative more semantic shortcut to the message container.
 	 *
-	 * @return \Illuminate\Support\MessageBag
+	 * @return array
 	 */
 	public function errors()
 	{
@@ -2040,26 +1917,6 @@ class Validator implements MessageProviderInterface {
 		return $this->messages;
 	}
 
-	/**
-	 * Get the messages for the instance.
-	 *
-	 * @return \Illuminate\Support\MessageBag
-	 */
-	public function getMessageBag()
-	{
-		return $this->messages();
-	}
-
-	/**
-	 * Set the IoC container instance.
-	 *
-	 * @param  \Illuminate\Container\Container  $container
-	 * @return void
-	 */
-	public function setContainer(Container $container)
-	{
-		$this->container = $container;
-	}
 
 	/**
 	 * Call a custom validator extension.
@@ -2072,31 +1929,10 @@ class Validator implements MessageProviderInterface {
 	{
 		$callback = $this->extensions[$rule];
 
-		if ($callback instanceof Closure)
-		{
-			return call_user_func_array($callback, $parameters);
-		}
-		elseif (is_string($callback))
-		{
-			return $this->callClassBasedExtension($callback, $parameters);
-		}
+		return call_user_func_array($callback, $parameters);
 	}
-
-	/**
-	 * Call a class based validator extension.
-	 *
-	 * @param  string  $callback
-	 * @param  array   $parameters
-	 * @return bool
-	 */
-	protected function callClassBasedExtension($callback, $parameters)
-	{
-		list($class, $method) = explode('@', $callback);
-
-		return call_user_func_array(array($this->container->make($class), $method), $parameters);
-	}
-
-	/**
+        
+        /**
 	 * Call a custom validator message replacer.
 	 *
 	 * @param  string  $message
@@ -2109,30 +1945,7 @@ class Validator implements MessageProviderInterface {
 	{
 		$callback = $this->replacers[$rule];
 
-		if ($callback instanceof Closure)
-		{
-			return call_user_func_array($callback, func_get_args());
-		}
-		elseif (is_string($callback))
-		{
-			return $this->callClassBasedReplacer($message, $attribute, $rule, $parameters);
-		}
-	}
-
-	/**
-	 * Call a class based validator message replacer.
-	 *
-	 * @param  string  $message
-	 * @param  string  $attribute
-	 * @param  string  $rule
-	 * @param  array   $parameters
-	 * @return string
-	 */
-	protected function callClassBasedReplacer($message, $attribute, $rule, $parameters)
-	{
-		list($class, $method) = explode('@', $callback);
-
-		return call_user_func_array(array($this->container->make($class), $method), func_get_args());
+		return call_user_func_array($callback, func_get_args());
 	}
 
 	/**
