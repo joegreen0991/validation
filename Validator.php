@@ -1177,16 +1177,36 @@ class Validator {
 		// which type of value it is and return the correct line for that type.
 		$type = $this->getAttributeType($attribute);
 
-		$keys = array("{$attribute}.{$lowerRule}", $lowerRule, "{$attribute}.{$lowerRule}.{$type}", "{$lowerRule}.{$type}");
+		$keys = array("{$attribute}.{$lowerRule}.{$type}", "{$lowerRule}.{$type}", "{$attribute}.{$lowerRule}", $lowerRule,);
 
 		// First we will check for a custom message for an attribute specific rule
 		// message for the fields, then we will check for a general custom line
 		// that is not attribute specific. If we find either we'll return it.
 		foreach ($keys as $key)
 		{
-			if (isset($source[$key])) return $source[$key];
+			if($string = $this->arrayGet($source, $key))
+                        {
+                            return $string;
+                        }
 		}
 	}
+        
+        private function arrayGet($array, $key)
+        {
+            if (isset($array[$key])) return $array[$key];
+
+            foreach (explode('.', $key) as $segment)
+            {
+                    if ( ! is_array($array) or ! array_key_exists($segment, $array))
+                    {
+                            return null;
+                    }
+
+                    $array = $array[$segment];
+            }
+
+            return $array;
+        }
 
 
 	/**
@@ -1821,32 +1841,11 @@ class Validator {
 	}
 
 	/**
-	 * Get the Translator implementation.
-	 *
-	 * @return \Symfony\Component\Translation\TranslatorInterface
-	 */
-	public function getTranslator()
-	{
-		return $this->translator;
-	}
-
-	/**
-	 * Set the Translator implementation.
-	 *
-	 * @param  \Symfony\Component\Translation\TranslatorInterface  $translator
-	 * @return void
-	 */
-	public function setTranslator(TranslatorInterface $translator)
-	{
-		$this->translator = $translator;
-	}
-
-	/**
 	 * Get the custom messages for the validator
 	 *
 	 * @return array
 	 */
-	public function getCustomMessages()
+	public function getMessages()
 	{
 		return $this->customMessages;
 	}
@@ -1857,7 +1856,7 @@ class Validator {
 	 * @param  array  $messages
 	 * @return void
 	 */
-	public function setCustomMessages(array $messages)
+	public function setMessages(array $messages)
 	{
 		$this->customMessages = array_merge($this->customMessages, $messages);
 	}
