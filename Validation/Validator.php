@@ -315,7 +315,7 @@ class Validator {
 
 		$message = $this->doReplacements($message, $attribute, $rule, $parameters);
 
-		$this->messages[$attribute] = $message;
+		$this->messages[$attribute][] = $message;
 	}
 
 	/**
