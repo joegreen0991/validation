@@ -108,13 +108,10 @@ class Validator {
 	);
 
 	/**
-	 * Create a new Validator instance.
-	 *
-	 * @param  \Symfony\Component\Translation\TranslatorInterface  $translator
-	 * @param  array  $data
-	 * @param  array  $rules
-	 * @param  array  $messages
-	 * @return void
+	 * @param array $messages
+	 * @param $data
+	 * @param $rules
+	 * @param array $customAttributes
 	 */
 	public function __construct($messages = array(), $data, $rules, $customAttributes = array())
 	{

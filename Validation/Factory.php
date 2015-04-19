@@ -49,8 +49,8 @@ class Factory {
 	/**
 	 * Create a new Validator factory instance.
 	 *
-	 * @param  array  $messages
-	 * @return void
+	 * @param array $messages
+	 * @param PresenceVerifierInterface $presenceVerifier
 	 */
 	public function __construct(array $messages = null, PresenceVerifierInterface $presenceVerifier = null)
 	{
@@ -62,10 +62,10 @@ class Factory {
 	/**
 	 * Create a new Validator instance.
 	 *
-	 * @param  array  $data
-	 * @param  array  $rules
-	 * @param  array  $messages
-	 * @return \Illuminate\Validation\Validator
+	 * @param array $data
+	 * @param array $rules
+	 * @param array $customAttributes
+	 * @return Validator
 	 */
 	public function make(array $data, array $rules, array $customAttributes = array())
 	{
@@ -87,8 +87,7 @@ class Factory {
 	/**
 	 * Add the extensions to a validator instance.
 	 *
-	 * @param  \Illuminate\Validation\Validator  $validator
-	 * @return void
+	 * @param $validator
 	 */
 	protected function addExtensions($validator)
 	{
