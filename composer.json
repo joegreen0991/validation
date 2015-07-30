@@ -20,10 +20,5 @@
             "Validation": ""
         }
     },
-    "extra": {
-        "branch-alias": {
-            "dev-master": "4.2-dev"
-        }
-    },
     "minimum-stability": "dev"
 }
