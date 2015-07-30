@@ -578,7 +578,7 @@ class Validator {
 	 */
 	protected function validateAccepted($attribute, $value)
 	{
-		$acceptable = array('yes', 'on', '1', 1);
+		$acceptable = array('yes', 'on', '1', 1, true);
 
 		return ($this->validateRequired($attribute, $value) && in_array($value, $acceptable, true));
 	}
